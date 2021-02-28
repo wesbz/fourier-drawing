@@ -248,11 +248,11 @@ if __name__=="__main__":
     
     if args.video:
         with tqdm(total=args.N_points) as pbar:
-            if args.video.split(".")[-1] == "mp4":
-                ani.save(args.video, fps=args.fps, progress_callback=lambda x, y: pbar.update(1), writer="ffmpeg", dpi=args.dpi, extra_args=["-threads", "0"])
+            if args.video.split(".")[-1] == "gif":
+                ani.save(args.video, codec=args.codec, fps=args.fps, progress_callback=lambda x, y: pbar.update(args.step), writer="imagemagick", dpi=args.dpi)
         
-            elif args.video.split(".")[-1] == "gif":
-                ani.save(args.video, fps=args.fps, progress_callback=lambda x, y: pbar.update(1), writer="pillow", dpi=args.dpi, extra_args=["-threads", "0"])
+            else:
+                ani.save(args.video, codec=args.codec, fps=args.fps, progress_callback=lambda x, y: pbar.update(args.step), writer="ffmpeg", dpi=args.dpi)
 
     if args.plot:
         plt.show()
