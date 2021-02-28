@@ -1,13 +1,14 @@
 import re
 import argparse
 import numpy as np
+
+from tqdm import tqdm
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import ConnectionPatch
 from matplotlib.animation import FuncAnimation
-from svgpathtools import svg2paths2
 
-N_samples = 500 # Temporal resolution
-N_vectors = 500 # Spectral bandwidth
+from svgpathtools import Path, Document
 
 file_path = "/home/wes/Downloads/WB_black.svg"
 
