@@ -10,56 +10,126 @@ from matplotlib.animation import FuncAnimation
 
 from svgpathtools import Path, Document
 
-file_path = "/home/wes/Downloads/WB_black.svg"
 
-paths, attributes, svg_attributes = svg2paths2(file_path)
-total_length = sum([path.length() for path in paths])
-samples_per_path = [round(N_samples * path.length()/total_length) for path in paths]
-shape = [path.point(i/samples_in_path) for path, samples_in_path in zip(paths, samples_per_path) for i in range(samples_in_path)]
+def get_paths(file_path):
+    doc = Document(file_path)
+    paths = doc.paths()
+    paths = [path for path in paths if path.length()>args.threshold_path_length]
+    return paths
 
-dt = 1 / N_samples
-t = np.arange(0, 1, dt)
+def order_paths(paths):
+    total_length = sum([path.length() for path in paths])
+    samples_per_path = [round(args.N_points * path.length()/total_length) for path in paths]
 
-freqs = np.arange(N_vectors // 2, -N_vectors // 2, -1)
+    # Order the shapes in each path in paths
+    for i, path in enumerate(paths):
+        tmp = Path(path.pop(0))
+        while len(path) > 1:
+            curr_end = tmp[-1].end
+            next_start = np.argmin(np.abs([next_path.start-curr_end for next_path in path]))
+            tmp.append(path.pop(next_start))
+        tmp.append(path[0])
+        paths[i] = tmp
 
-# Make a matrix to represent the Fourier basis functions
-#        (    freqs,         t)
-# shape: (N_vectors, N_samples)
-Fourier = np.exp(- 2 * np.pi * 1j * np.outer(freqs, t))
+    # Sample points along the paths
+    shape = [[path.point(i/samples_in_path) for i in range(samples_in_path) if samples_in_path > 0] for path, samples_in_path in zip(paths, samples_per_path)]
+    
+    # Order the paths
+    tmp = shape.pop(0)
+    while len(shape) > 0:
+        curr_end = tmp[-1]
+        next_start = np.argmin(np.abs([path[0]-curr_end for path in shape]))
+        tmp.extend(shape.pop(next_start))
 
-# Or basically any path drawing whatever you want
-forme = np.exp(- 2 * np.pi * 1j * t) + 0.7*np.exp(+ 4 * np.pi * 1j * t)
-forme = np.array(shape)
+    # Center and normalize the points
+    shape = np.conjugate(tmp)
+    shape -= np.mean(shape)
+    shape /= np.max(np.abs(shape))
+    
+    return shape
 
-Fourier_coeffs = Fourier @ forme * dt
 
-orbits = Fourier * Fourier_coeffs.reshape(N_vectors, 1)
-cum_orbits = np.cumsum(Fourier * Fourier_coeffs.reshape(N_vectors, 1), axis=0)
-cum_orbits = np.vstack([np.zeros((N_samples,)), cum_orbits])
+def compute_fourier_serie(shape):
+    N_samples = len(shape)
+    dt = 1 / N_samples
+    t = np.arange(0, 1, dt)
+    freqs = np.arange(args.N_vectors // 2, -args.N_vectors // 2, -1)
 
-radius = np.abs(orbits[:, 0])
+    # Make a matrix to represent the Fourier basis functions
+    #        (    freqs,         t)
+    # shape: (N_vectors, N_samples)
+    Fourier = np.exp(- 2 * np.pi * 1j * np.outer(freqs, t))
 
-fig, ax = plt.subplots(figsize=(10,10))
-fig_lim = np.max(np.abs(cum_orbits))*1.05
-plt.xlim(np.min(cum_orbits.real),np.max(cum_orbits.real))
-plt.ylim(np.min(cum_orbits.imag),np.max(cum_orbits.imag))
-plt.plot(forme.real, forme.imag)
-pl, = plt.plot([], [])
+    # Or basically any path drawing whatever you want
+    forme = np.array(shape)
 
-draw_idx = [i for i, r in enumerate(radius) if r > 0.005*fig_lim]
+    Fourier_coeffs = Fourier @ forme * dt
 
-def animate(frame):
-    ax.patches = []
-    c_B = cum_orbits[0, int(frame)]
-    for i in range(1, N_vectors+1):
-        c_A, c_B = c_B, cum_orbits[i, int(frame)]
-        r = radius[i-1]
-        if r > 0.005*fig_lim:
-            ax.add_patch(plt.Circle((c_A.real, c_A.imag), r, fill=False, linestyle="dotted"))
-            ax.add_patch(ConnectionPatch((c_A.real, c_A.imag), (c_B.real, c_B.imag), ax.transData, arrowstyle="-"))
+    orbits = Fourier * Fourier_coeffs.reshape(args.N_vectors, 1)
+    cum_orbits = np.cumsum(Fourier * Fourier_coeffs.reshape(args.N_vectors, 1), axis=0)
+    cum_orbits = np.vstack([np.zeros((args.N_points,)), cum_orbits])
+    
+    return orbits, cum_orbits
+
+def plot_fourier(orbits, cum_orbits):
+    h, w = (np.max(cum_orbits.imag)-np.min(cum_orbits.imag)), (np.max(cum_orbits.real)-np.min(cum_orbits.real))
+    r = w / h
+    if args.width != None and args.height != None:
+        fig, ax = plt.subplots(figsize=(args.width/args.dpi, args.height/args.dpi), dpi=args.dpi)
+        W, H = args.width, args.height
+    else:
+        fig, ax = plt.subplots(figsize=plt.figaspect(h/w), dpi= args.dpi)
+        W, H = fig.get_size_inches()
+    if len(args.background_color) == 9:
+        fig.patch.set_alpha(float(int(args.background_color[-2:], 16) / 256))
+    fig.patch.set_facecolor(args.background_color[:7])
+    R = W / H
+    plt.ylim(np.min(cum_orbits.imag),np.max(cum_orbits.imag))
+    plt.xlim(np.min(cum_orbits.real)-(R-r)*h/2,np.max(cum_orbits.real)+(R-r)*h/2)
+    #plt.gca().set_aspect("auto")
+    plt.axis("off")
+    #plt.plot(forme.real, forme.imag)
+    pl, = plt.plot([], [], color=args.line_color, linewidth=args.line_width)
+    plt.tight_layout(pad=0)
+
+    radius = np.abs(orbits[:, 0])
+    draw_idx = [i for i, r in enumerate(radius) if r > args.threshold_vectors_module]
+
+    for i in draw_idx:
+        c_A, c_B = cum_orbits[i, 0], cum_orbits[i+1, 0]
+        r = radius[i]
+        ax.add_patch(plt.Circle((c_A.real, c_A.imag), r, fill=False, linestyle="dotted"))
+        ax.add_patch(ConnectionPatch((c_A.real, c_A.imag), (c_B.real, c_B.imag), ax.transData, arrowstyle="-"))
+
+    def animate(frame):
+        ax.patches = []
+        c_B = cum_orbits[0, int(frame)]
+        #for i in range(1, N_vectors+1):
+        for j, i in enumerate(draw_idx):
+            c_A, c_B = cum_orbits[i, int(frame)], cum_orbits[i+1, int(frame)]
+            r = radius[i]
+            # ax.patches[2*j].set_center((c_A.real, c_A.imag))
+            # ax.patches[2*j+1].xyA = (c_A.real, c_A.imag)
+            # ax.patches[2*j+1].xyB = (c_B.real, c_B.imag)
+            # ax.patches[2*j+1].stale = True
+            ax.add_patch(plt.Circle((c_A.real, c_A.imag), r, fill=False, linestyle="dotted", linewidth=args.circle_width))
+            ax.add_patch(ConnectionPatch((c_A.real, c_A.imag), (c_B.real, c_B.imag), ax.transData, arrowstyle="-", linewidth=args.vector_width))
             #ax.add_patch(plt.Arrow(c_A.real, c_A.imag, c_C.real, c_C.imag, width=0.3))
-    pl.set_data(cum_orbits[-1,:int(frame)+1].real, cum_orbits[-1,:int(frame)+1].imag)
-    return ax.patches+ [pl,]
+        x, y = cum_orbits[-1,:int(frame)+1].real, cum_orbits[-1,:int(frame)+1].imag
+        pl.set_data(x, y)
+        return ax.patches+ [pl,]
+
+    ani = FuncAnimation(
+        fig,
+        func=animate,
+        frames=range(0, args.N_points, ),
+        interval=args.interval,
+        blit=False
+    )
+    
+    return ani
+
+
 if __name__=="__main__":
     
     def color_parser(color):
@@ -177,4 +247,4 @@ if __name__=="__main__":
                 ani.save(args.video, fps=args.fps, progress_callback=lambda x, y: pbar.update(1), writer="pillow", dpi=args.dpi, extra_args=["-threads", "0"])
 
     if args.plot:
-plt.show()
+        plt.show()
