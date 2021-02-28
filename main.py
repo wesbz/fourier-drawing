@@ -182,6 +182,10 @@ if __name__=="__main__":
                         help="Frame rate for the generated video.",
                         default=24,
                         type=int)
+    parser.add_argument("--codec",
+                        help="Codec for the generated video.",
+                        default="h264",
+                        type=str)
     parser.add_argument("--dpi",
                         help="Dots per inch in the generated video.",
                         default=100,
