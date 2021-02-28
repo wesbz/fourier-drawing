@@ -122,7 +122,7 @@ def plot_fourier(orbits, cum_orbits):
     ani = FuncAnimation(
         fig,
         func=animate,
-        frames=range(0, args.N_points, ),
+        frames=range(0, args.N_points, args.step),
         interval=args.interval,
         blit=False
     )
@@ -167,6 +167,10 @@ if __name__=="__main__":
                         action="store_true")
     parser.add_argument("--interval",
                         help="Interval between two frames (in milliseconds).",
+                        default=1,
+                        type=int)
+    parser.add_argument("--step",
+                        help="Number of steps between two frames.",
                         default=1,
                         type=int)
 
