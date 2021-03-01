@@ -86,7 +86,7 @@ def plot_fourier(orbits, cum_orbits):
     R = W / H
     plt.ylim(np.min(cum_orbits.imag),np.max(cum_orbits.imag))
     plt.xlim(np.min(cum_orbits.real)-(R-r)*h/2,np.max(cum_orbits.real)+(R-r)*h/2)
-    #plt.gca().set_aspect("auto")
+
     plt.axis("off")
     #plt.plot(forme.real, forme.imag)
     pl, = plt.plot([], [], color=args.line_color, linewidth=args.line_width)
@@ -104,17 +104,13 @@ def plot_fourier(orbits, cum_orbits):
     def animate(frame):
         ax.patches = []
         c_B = cum_orbits[0, int(frame)]
-        #for i in range(1, N_vectors+1):
+
         for j, i in enumerate(draw_idx):
             c_A, c_B = cum_orbits[i, int(frame)], cum_orbits[i+1, int(frame)]
             r = radius[i]
-            # ax.patches[2*j].set_center((c_A.real, c_A.imag))
-            # ax.patches[2*j+1].xyA = (c_A.real, c_A.imag)
-            # ax.patches[2*j+1].xyB = (c_B.real, c_B.imag)
-            # ax.patches[2*j+1].stale = True
-            ax.add_patch(plt.Circle((c_A.real, c_A.imag), r, fill=False, linestyle="dotted", linewidth=args.circle_width))
-            ax.add_patch(ConnectionPatch((c_A.real, c_A.imag), (c_B.real, c_B.imag), ax.transData, arrowstyle="-", linewidth=args.vector_width))
-            #ax.add_patch(plt.Arrow(c_A.real, c_A.imag, c_C.real, c_C.imag, width=0.3))
+            ax.add_patch(plt.Circle((c_A.real, c_A.imag), r, fill=False, linestyle="dotted", linewidth=args.circle_width, color=args.circle_color))
+            ax.add_patch(ConnectionPatch((c_A.real, c_A.imag), (c_B.real, c_B.imag), ax.transData, arrowstyle="-", linewidth=args.vector_width, color=args.vector_color))
+
         x, y = cum_orbits[-1,:int(frame)+1].real, cum_orbits[-1,:int(frame)+1].imag
         pl.set_data(x, y)
         return ax.patches+ [pl,]
